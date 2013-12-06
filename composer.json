@@ -1,0 +1,21 @@
+{
+	"name": "rgsone/slim-controller-connector",
+	"description": "Extension for Slim Framework who provides a simple way to connect a controller with a Slim route.",
+	"keywords": [ "slim", "extension", "microframework", "controller", "router" ],
+	"homepage": "http://github.com/rgsone/slim-controller-connector",
+	"license": "MIT",
+	"authors": [{
+		"name": "rgsone",
+		"email": "rgs@rgsone.com",
+		"homepage": "http://rgsone.com"
+	}],
+	"require": {
+		"php": ">=5.3.0",
+		"slim/slim": "~2.3"
+	},
+	"autoload": {
+		"psr-0": {
+			"Rgsone\\Slim": "src/"
+		}
+	}
+}
