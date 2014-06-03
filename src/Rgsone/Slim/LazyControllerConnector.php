@@ -1,28 +1,27 @@
 <?php
 
-/* ################################################
-###################################################
-#
-#   Slim ControllerConnector is an extension
-#	for Slim Framework who provides
-#	a simple way to connect a controller
-#	with a Slim route.
-#
-#   @author	rgsone aka rudy marc
-#   @web	http://rgsone.com
-#
-###################################################
-################################################ */
+/* #######################################################################
+//////////////////////////////////////////////////////////////////////////
+
+	Slim LazyControllerConnector is an extension for Slim Framework
+	who provides a simple way to connect and 'lazy load' controller(s)
+	with Slim route(s)
+
+	@author	rgsone aka rudy marc
+	@web	http://rgsone.com
+
+//////////////////////////////////////////////////////////////////////////
+####################################################################### */
 
 namespace Rgsone\Slim;
 
 use Slim\Route;
 
 /**
- * Class ControllerConnector
+ * Class LazyControllerConnector
  * @package Rgsone\Slim
  */
-class ControllerConnector
+class LazyControllerConnector
 {
 	############################################################################
 	//// PRIVATE PROP //////////////////////////////////////////////////////////
