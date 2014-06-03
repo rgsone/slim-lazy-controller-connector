@@ -24,14 +24,14 @@ use Slim\Route;
 class LazyControllerConnector
 {
 	############################################################################
-	//// PRIVATE PROP //////////////////////////////////////////////////////////
+	//// PRIVATE PROPERTY //////////////////////////////////////////////////////
 	############################################################################
 
 	/** @var \Slim\Slim Slim instance */
-	protected $_slimApp;
+	protected $_slim;
 	/** @var array Controllers list */
 	protected $_controllers = array();
-	/** @var string Namespace prefix, ex : '\\Foo\\Bar' */
+	/** @var string Namespace prefix */
 	protected $_namespacePrefix;
 
 	############################################################################
@@ -43,7 +43,7 @@ class LazyControllerConnector
 	 */
 	public function __construct( \Slim\Slim $slim )
 	{
-		$this->_slimApp = $slim;
+		$this->_slim = $slim;
 		$this->_namespacePrefix = '\\';
 	}
 
@@ -72,25 +72,8 @@ class LazyControllerConnector
 	}
 
 	/**
-	 * @param string $name Controller name, ex. : 'MyController'
-	 */
-	protected function register( $name )
-	{
-		$controller = $this->_namespacePrefix . $name;
-
-		if ( !array_key_exists( $controller, $this->_controllers ) )
-		{
-			$this->_controllers[ $controller ] = $this->share( function() use ( $controller ) {
-
-				return new $controller( $this->_slimApp );
-
-			});
-		}
-	}
-
-	/**
 	 * Return the same unique instance of asked controller (singleton)
-	 * @param string $name Controller name, ex. : 'MyController'
+	 * @param string $name Controller name
 	 * @return object Instance of controller
 	 */
 	protected function getController( $name )
@@ -101,7 +84,6 @@ class LazyControllerConnector
 	############################################################################
 	//// PUBLIC METHOD /////////////////////////////////////////////////////////
 	############################################################################
-
 
 	/**
 	 * Connects a route with her controller/action.
@@ -174,7 +156,7 @@ class LazyControllerConnector
 			}
 		}
 
-		$this->_slimApp->router->map( $route );
+		$this->_slim->router->map( $route );
 
 		return $route;
 	}
@@ -270,12 +252,56 @@ class LazyControllerConnector
 
 			}
 
-			$this->_slimApp->router()->map( $route );
+			$this->_slim->router()->map( $route );
 		}
 	}
 
 	/**
-	 * Set controllers namespace prefix
+	 * Register a controller from his name.
+	 * @param string $name Controller name, ex. : 'MyController'
+	 */
+	public function register( $name )
+	{
+		$controller = $this->_namespacePrefix . $name;
+
+		if ( !array_key_exists( $controller, $this->_controllers ) )
+		{
+			$this->_controllers[ $controller ] = $this->share( function() use ( $controller ) {
+
+				return new $controller( $this->_slim );
+
+			});
+		}
+	}
+
+	/**
+	 * Calls a method/action of a registered controller
+	 *
+	 * Example :
+	 * $lazyControllerConnector->register( 'MyController' );
+	 * $lazyControllerConnector->callAction( 'MyController', 'myAction' );
+	 *
+	 * @param string $controllerName Controller name
+	 * @param string $methodName Method name
+	 * @param array|null $params Array of parameters of method if exists
+	 */
+	public function callAction( $controllerName, $methodName, $params = null )
+	{
+		$params = ( null !== $params ) ? $params : array();
+
+		call_user_func_array(
+			array(
+				$this->getController( $controllerName ),
+				$methodName
+			),
+			$params
+		);
+	}
+
+	/**
+	 * Defined a namespace préfix for controllers
+	 * If controller namespace is \Foo\Bar\MyController, use
+	 * setNamespacePrefix( '\\Foo\\Bar' );
 	 * @param string $namespacePrefix Namespace prefix, ex. : '\\Foo\\Bar'
 	 */
 	public function setNamespacePrefix( $namespacePrefix )
