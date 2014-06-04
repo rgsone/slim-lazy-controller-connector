@@ -1,17 +1,17 @@
 <?php
 
-/* #######################################################################
-//////////////////////////////////////////////////////////////////////////
+/* ############################################################################
+///////////////////////////////////////////////////////////////////////////////
 
-	Slim LazyControllerConnector is an extension for Slim Framework
+	LazyControllerConnector is an extension for Slim Framework
 	who provides a simple way to connect and 'lazy load' controller(s)
-	with Slim route(s)
+	and middleware(s) with a Slim route(s).
 
 	@author	rgsone aka rudy marc
 	@web	http://rgsone.com
 
-//////////////////////////////////////////////////////////////////////////
-####################################################################### */
+///////////////////////////////////////////////////////////////////////////////
+############################################################################ */
 
 namespace Rgsone\Slim;
 
@@ -29,10 +29,8 @@ class LazyControllerConnector
 
 	/** @var \Slim\Slim Slim instance */
 	protected $_slim;
-	/** @var array Controllers list */
+	/** @var array */
 	protected $_controllers = array();
-	/** @var string Namespace prefix */
-	protected $_namespacePrefix;
 
 	############################################################################
 	//// CONSTRUCTOR ///////////////////////////////////////////////////////////
@@ -44,7 +42,6 @@ class LazyControllerConnector
 	public function __construct( \Slim\Slim $slim )
 	{
 		$this->_slim = $slim;
-		$this->_namespacePrefix = '\\';
 	}
 
 	############################################################################
@@ -52,33 +49,67 @@ class LazyControllerConnector
 	############################################################################
 
 	/**
-	 * @param \Closure $callable
+	 * @param string $class
 	 * @return callable
 	 */
-	protected function share( \Closure $callable )
+	protected function share( $class )
 	{
-		return function () use ( $callable ) {
-
+		return function () use ( $class )
+		{
 			static $object;
 
 			if ( null === $object )
 			{
-				$object = $callable();
+				$object = new $class( $this->_slim );
 			}
 
 			return $object;
-
 		};
 	}
 
 	/**
-	 * Return the same unique instance of asked controller (singleton)
+	 * Registers a controller if he is not already registered
+	 * and returns his instance
 	 * @param string $name Controller name
-	 * @return object Instance of controller
+	 * @return mixed Instance of registered controller
 	 */
-	protected function getController( $name )
+	protected function register( $controller )
 	{
-		return $this->_controllers[ $this->_namespacePrefix . $name ]();
+		if ( array_key_exists( $controller, $this->_controllers ) )
+		{
+			return $this->_controllers[ $controller ]();
+		}
+
+		$this->_controllers[ $controller ] = $this->share( $controller );
+
+		return $this->_controllers[ $controller ]();
+	}
+
+	/**
+	 * Binds a list of middleware to a Slim route
+	 * @param \Slim\Route $route Slim Route instance
+	 * @param array $middlewares Array of callable middleware
+	 */
+	protected function bindMiddlewares( \Slim\Route $route, array $middlewares )
+	{
+		foreach ( $middlewares as $mw )
+		{
+			if ( is_callable( $mw ) )
+			{
+				$route->setMiddleware( $mw );
+			}
+			elseif ( is_string( $mw ) )
+			{
+				$mwSplit = explode( ':', $mw );
+				$mwClass = $mwSplit[0];
+				$mwMethod = $mwSplit[1];
+
+				$route->setMiddleware( function() use ( $mwClass, $mwMethod ) {
+					$middleware = $this->register( $mwClass );
+					call_user_func( array( $middleware, $mwMethod ) );
+				});
+			}
+		}
 	}
 
 	############################################################################
@@ -86,74 +117,57 @@ class LazyControllerConnector
 	############################################################################
 
 	/**
-	 * Connects a route with her controller/action.
+	 * Connects a route with a controller/action and middleware(s).
 	 *
-	 * Examples :
-	 * connect( 'GET',      '/',		 	 'Controller:action' );
+	 * Usage :
+	 * connect( 'GET', '/', 'Controller:action' );
 	 * connect( 'GET|POST', '/foo/bar/:id/', 'Controller:action' );
-	 * connect( 'GET',      '/foo/',		 'Controller:action', array( function() { echo 'middleware'; } ) );
-	 * connect( 'POST',     '/foo/bar/:id/', 'Controller:action', array( 'Middleware1:action', 'Middleware2:action' ) );
+	 * connect( 'GET', '/foo/', 'Controller:action', array( function() { echo 'middleware'; } ) );
+	 * connect( 'POST', '/foo/bar/:id/', 'Controller:action', array( 'Middleware1:action', 'Middleware2:action' ) );
 	 *
-	 * @param string 	 $method 		HTTP Method,
-	 * 									ex : 'GET' match GET method
-	 * 									multiple methods are allowed, separate them by '|',
-	 * 						 			ex : 'GET|POST|UPDATE' match GET, POST, and UPDATE method
+	 * @param string 	 $httpMethod 	HTTP Method,
+	 * 									ex. : 'GET' for GET method
+	 * 									multiple methods are allowed, separate them by a pipe '|'
+	 * 						 			ex. : 'GET|POST|UPDATE' for GET, POST, and UPDATE method
 	 *
 	 * @param string 	 $pattern 		Route pattern, like Slim route pattern,
-	 * 						  			ex : '/' or '/foo/bar/:id'
+	 * 						  			ex. : '/' or '/foo/bar/:id'
 	 *
-	 * @param string 	 $controller 	Controller and action to call,
+	 * @param string 	 $callable 		Controller and action to call,
 	 * 							 		ex. : 'MyController:myAction'
 	 *
-	 * @param null|array $middleware 	List of middlewares to call
+	 * @param null|array $middlewares 	An array of middlewares to call
 	 *
-	 * @return \Slim\Route
+	 * @return \Slim\Route Instance of \Slim\Route
 	 */
-	public function connect( $method, $pattern, $controller, $middleware = null )
+	public function connect( $httpMethod, $pattern, $callable, array $middlewares = array() )
 	{
-		$httpMethod = explode( '|', $method );
+		## creates Slim Route instance
 
-		$ctrlCall = explode( ':', $controller );
-		$controllerName = $ctrlCall[0];
-		$actionName = $ctrlCall[1];
+		$split = explode( ':', $callable );
+		$className = $split[0];
+		$methodName = $split[1];
 
-		$this->register( $controllerName );
+		$routeCallable = function() use ( $className, $methodName ) {
+			$controller = $this->register( $className );
+			return call_user_func_array( array( $controller, $methodName ), func_get_args() );
+		};
 
-		$route = new Route( $pattern, function () use ( $controllerName, $actionName ) {
+		$route = new Route( $pattern, $routeCallable );
 
-			$args = func_get_args();
-			$ctrl = $this->getController( $controllerName );
-			return call_user_func_array( array( $ctrl, $actionName ), $args );
+		## binds HTTP method(s)
 
-		});
-
-		foreach ( $httpMethod as $m )
+		$methods = explode( '|', $httpMethod );
+		foreach ( $methods as $m )
 		{
 			$route->via( $m );
 		}
 
-		if ( null !== $middleware && is_array( $middleware ) )
+		## binds middleware(s)
+
+		if ( !empty( $middlewares ) )
 		{
-			foreach ( $middleware as $mw )
-			{
-				if ( is_callable( $mw ) )
-				{
-					$route->setMiddleware( $mw );
-				}
-				elseif ( is_string( $mw ) )
-				{
-					$mwCall = explode( ':', $mw );
-
-					$this->register( $mwCall[0] );
-
-					$route->setMiddleware( function() use ( $mwCall ) {
-						call_user_func(array(
-							$this->getController( $mwCall[0] ),
-							$mwCall[1]
-						));
-					});
-				}
-			}
+			$this->bindMiddlewares( $route, $middlewares );
 		}
 
 		$this->_slim->router->map( $route );
@@ -165,8 +179,7 @@ class LazyControllerConnector
 	 * Connects a controller with multiples routes.
 	 *
 	 * Usage :
-	 *
-	 * ControllerConnector::connectRoutes(
+	 * connectRoutes(
 	 * 		'MyController',
 	 * 		array(
 	 *			'/foo' => array(
@@ -179,33 +192,40 @@ class LazyControllerConnector
 	 * 		[, middleware, middleware, ...]
 	 * );
 	 *
-	 * @param string $controller Controller name, ex. : 'MyController'
-	 * @param array $routes List of routes and their parameters
-	 * @param callable Globals middlewares, called for each route
+	 * @param string 	$controller Controller name, ex. : 'MyController'
+	 * @param array 	$routes 	List of routes and their parameters
+	 * @param callable 				Globals middlewares, called for each route
 	 */
 	public function connectRoutes( $controller, array $routes )
 	{
-		$this->register( $controller );
+		## get global middlewares if exists
 
 		if ( func_num_args() > 2 )
 		{
-			$globalsMiddlewares = array_slice( func_get_args(), 2 );
+			$globalMiddlewares = array_slice( func_get_args(), 2 );
 		}
+
+		## parse routes
 
 		foreach ( $routes as $pattern => $params )
 		{
 			if ( !isset( $params['action'] ) )
 			{
-				throw new \Exception( 'route action parameter is require' );
+				throw new \Exception( 'route action parameter is required' );
 			}
 
-			$route = new Route( $pattern, function() use ( $params, $controller ) {
+			## creates route
 
-				$args = func_get_args();
-				$ctrl = $this->getController( $controller );
-				return call_user_func_array( array( $ctrl, $params['action'] ), $args );
+			$methodName = $params['action'];
 
-			});
+			$routeCallable = function() use ( $controller, $methodName ) {
+				$instance = $this->register( $controller );
+				return call_user_func_array( array( $instance, $methodName ), func_get_args() );
+			};
+
+			$route = new Route( $pattern, $routeCallable );
+
+			## binds HTTP methods
 
 			$params['method'] = ( isset( $params['method'] ) && is_string( $params['method'] ) ) ? $params['method'] : 'GET';
 			$methods = explode( '|', $params['method'] );
@@ -215,97 +235,52 @@ class LazyControllerConnector
 				$route->via( $m );
 			}
 
+			## binds route name
+
 			if ( isset( $params['name'] ) && is_string( $params['name'] ) )
 			{
 				$route->name( $params['name'] );
 			}
+
+			## binds route conditions
 
 			if ( isset( $params['conditions'] ) && is_array( $params['conditions'] ) )
 			{
 				$route->conditions( $params['conditions'] );
 			}
 
-			$middlewares = ( isset( $globalsMiddlewares ) ) ? $globalsMiddlewares : array();
+			## binds middlewares
 
+			$middlewares = ( isset( $globalMiddlewares ) ) ? $globalMiddlewares : array();
 			$middlewares = ( isset( $params['middlewares'] ) && is_array( $params['middlewares'] ) )
 						   ? array_merge( $middlewares, $params['middlewares'] )
 						   : $middlewares;
 
-			foreach ( $middlewares as $mw )
+			if ( !empty( $middlewares ) )
 			{
-				if ( is_callable( $mw ) )
-				{
-					$route->setMiddleware( $mw );
-				}
-				elseif ( is_string( $mw ) )
-				{
-					$call = explode( ':', $mw );
-					$this->register( $call[0] );
-
-					$route->setMiddleware( function() use ( $call ) {
-						call_user_func(array(
-							$this->getController( $call[0] ),
-							$call[1]
-						));
-					});
-				}
-
+				$this->bindMiddlewares( $route, $middlewares );
 			}
+
+			## map to router
 
 			$this->_slim->router()->map( $route );
 		}
 	}
 
 	/**
-	 * Register a controller from his name.
-	 * @param string $name Controller name, ex. : 'MyController'
-	 */
-	public function register( $name )
-	{
-		$controller = $this->_namespacePrefix . $name;
-
-		if ( !array_key_exists( $controller, $this->_controllers ) )
-		{
-			$this->_controllers[ $controller ] = $this->share( function() use ( $controller ) {
-
-				return new $controller( $this->_slim );
-
-			});
-		}
-	}
-
-	/**
-	 * Calls a method/action of a registered controller
+	 * Calls a method/action of a controller
 	 *
-	 * Example :
-	 * $lazyControllerConnector->register( 'MyController' );
-	 * $lazyControllerConnector->callAction( 'MyController', 'myAction' );
+	 * Usage :
+	 * callAction( 'MyController', 'myAction' );
+	 * callAction( 'MyController', 'myAction', array( 'my', 'parameters', 11 ) );
 	 *
-	 * @param string $controllerName Controller name
-	 * @param string $methodName Method name
-	 * @param array|null $params Array of parameters of method if exists
+	 * @param string $controller Controller name
+	 * @param string $method Method name
+	 * @param array $params Array of parameters
 	 */
-	public function callAction( $controllerName, $methodName, $params = null )
+	public function callAction( $controller, $method, array $params = array() )
 	{
-		$params = ( null !== $params ) ? $params : array();
-
-		call_user_func_array(
-			array(
-				$this->getController( $controllerName ),
-				$methodName
-			),
-			$params
-		);
-	}
-
-	/**
-	 * Defined a namespace préfix for controllers
-	 * If controller namespace is \Foo\Bar\MyController, use
-	 * setNamespacePrefix( '\\Foo\\Bar' );
-	 * @param string $namespacePrefix Namespace prefix, ex. : '\\Foo\\Bar'
-	 */
-	public function setNamespacePrefix( $namespacePrefix )
-	{
-		$this->_namespacePrefix = $namespacePrefix . '\\';
+		$instance = $this->register( $controller );
+		return call_user_func_array( array( $instance, $method ), $params );
 	}
 } 
