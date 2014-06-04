@@ -1,96 +1,102 @@
-# slim-controller-connector
+# slim-lazy-controller-connector
 
-Slim `ControllerConnector` is an extension for Slim Framework who provides
-a simple way to connect a controller with a Slim route.
+Slim `LazyControllerConnector` is an extension for Slim Framework who provides a simple way to connect
+and 'lazy load' controllers & middlewares with Slim routes.
 
 ### Features
 
-* The controller for a particular route is instantiated only if his route is matched
+* Provides a lazy loading for controllers and middlewares
 * The registered controllers are instantiated only once (singleton)
+* Provides a simple way to bind a controller with multiple routes and middlewares
 
 ## Install
 
 With Composer.
 
 	"require": {
-		"slim/slim": "~2.3",
-		"rgsone/slim-controller-connector": "dev-master"
+		"slim/slim": "~2.4",
+		"rgsone/slim-lazy-controller-connector": "dev-master"
 	}
 
 ## Usage
 
-`ControllerConnector` provide two ways to connect Slim routes with controllers.
+`LazyControllerConnector` provides two ways to connect Slim routes with controllers.
+Provides also a simple way to call a method's controller.
 
 ### Single route way
 
-setup
+Setup
 
 	<?php
 
 	$slim = new \Slim\Slim();
-    // ControllerConnector needs a Slim instance
-    $connector = new \Rgsone\Slim\ControllerConnector( $slim );
+    // LazyControllerConnector needs a Slim instance
+    $connector = new \Rgsone\Slim\LazyControllerConnector( $slim );
 
-basic usage
+Basic usage
 
-    // connects '/' with 'MyController' and calls his 'myAction' method via GET method
-    $connector->connect( 'GET', '/', 'MyController:myAction' );
+    // connects route '/' with 'MyController' and calls his 'myAction' method via GET method
+    $connector->connect( 'GET', '/', '\MyController:myAction' );
 
-    // another example
-    $connector->connect( 'GET', '/foo/', 'MyOtherController:myAction' );
+    // anothers examples
+    $connector->connect( 'GET', '/foo/', '\MyOtherController:myAction' );
+    // with namespace
+    $connector->connect( 'GET', '/foo/bar/', '\Foo\Bar\Controller:myAction' );
 
-also accepts an array of middlewares to call, in additional parameters
+Also accepts an array of middlewares to call in additional parameters
 
     $connector->connect(
     	'GET',
     	'/middleware/',
-    	'MyController:myAction',
+    	'\MyController:myAction',
     	array(
     		function() { echo 'middleware'; },
     		function() { echo 'another middleware'; },
     		// middlewares can also to be called like this
-    		'MyMiddleware:myAction'
+    		'\MyMiddleware:myAction'
     		// or in any callable forms
     	)
     );
 
-`ControllerConnector::connect` method returns an `\Slim\Route` object, so it is possible to add a route name and/or
-a route conditions like Slim routing system
+`LazyControllerConnector::connect` method returns an `\Slim\Route` instance, so it is possible to add a route name
+and/or a route conditions like Slim routing system
 
-    $connector->connect( 'GET', '/bar/', 'MyController:myAction' )
+    $connector->connect( 'GET', '/bar/', '\MyController:myAction' )
     	->name( 'my.route.name' );
 
-    $connector->connect( 'GET', '/bar/:id', 'MyController:myAction' )
+    $connector->connect( 'GET', '/bar/:id', '\MyController:myAction' )
     	->conditions( array( 'id' => '[0-9]+' ) )
     	->name( 'my.route.with.id.name' );
 
-it also possible to bind multiples HTTP methods on a same route
+It also possible to bind multiples HTTP methods on a same route
 
     // binds with GET and POST methods
-    $connector->connect( 'GET|POST', '/foo/bar', 'MyController:myAction' );
+    $connector->connect( 'GET|POST', '/foo/bar', '\MyController:myAction' );
 
     // binds with GET, POST, DELETE and PUT methods
-    $connector->connect( 'GET|POST|DELETE|PUT', '/foo/bar', 'MyController:myAction' );
+    $connector->connect( 'GET|POST|DELETE|PUT', '/foo/bar', '\MyController:myAction' );
 
 
 ### Multiple routes for a same controller
 
-setup
+Setup
 
 	<?php
 
 	$slim = new \Slim\Slim();
-    // ControllerConnector needs a Slim instance
-    $connector = new \Rgsone\Slim\ControllerConnector( $slim );
+    // LazyControllerConnector needs a Slim instance
+    $connector = new \Rgsone\Slim\LazyControllerConnector( $slim );
 
-basic usage,
+Basic usage,
 the only required parameter for each route is `action`, all others are optionnal by default,
 if the `method` parameter is not present, the default HTTP method is `GET`
 
 	$connector->connectRoutes(
 
-		'MyController',
+		// controller
+		'\MyController',
 
+		// route list
 		array(
 			'/' => array(
 				'action' => 'myAction'
@@ -107,12 +113,12 @@ if the `method` parameter is not present, the default HTTP method is `GET`
 
 	);
 
-it is possible to bind multiples HTTP methods for a same route,
-like `ControllerConnector::connect` each method must be separated by a `|`
+It is possible to bind multiples HTTP methods for a same route,
+like `LazyControllerConnector::connect` each method must be separated by a pipe `|`
 
 	$connector->connectRoutes(
 
-		'MyController',
+		'\Foo\MyController',
 
 		array(
 			'/foo/foo' => array(
@@ -124,11 +130,11 @@ like `ControllerConnector::connect` each method must be separated by a `|`
 
 	);
 
-in addition, it is possible to name route, add conditions and add a middlewares for the same route
+In addition, it is possible to name route, add conditions and add a middlewares for the same route
 
 	$connector->connectRoutes(
 
-		'MyController',
+		'\MyController',
 
 		array(
 			'/foo/:id' => array(
@@ -144,19 +150,19 @@ in addition, it is possible to name route, add conditions and add a middlewares 
 				'middlewares' => array(
 					function() { echo 'route middleware'; },
 					// middlewares can also be called like this
-					'MyMiddleware:myAction'
+					'\Middlewares\MyMiddleware:myAction'
 				)
 			)
 		)
 
 	);
 
-as a last, a globals middlewares can be defined,
-a global middleware is a middleware who is called for each declared route
+As a last, a globals middlewares can be defined,
+a global middleware is a middleware who is binded with each declared route
 
 	$connector->connectRoutes(
 
-		'MyController',
+		'\MyController',
 
 		array(
 			'/foo/bar' => array(
@@ -167,17 +173,17 @@ a global middleware is a middleware who is called for each declared route
 			)
 		),
 
-		// this middlewares will be called for '/foo/bar' and '/bar/foo' routes
+		// these middlewares will be called for '/foo/bar' and '/bar/foo' routes
 		function() { echo 'global middleware'; },
-		'MyMiddleware:myAction'
+		'\MyMiddleware:myAction'
 
 	);
 
-full example
+Full example
 
 	$connector->connectRoutes(
 
-		'MyController',
+		'\Foo\Bar\MyController',
 
 		array(
 			'/foobar' => array(
@@ -185,7 +191,7 @@ full example
 				'action' => 'myAction',
 				'name' => 'route.foobar',
 				'middlewares' => array(
-					'MyMiddleware:myAction'
+					'\Middlewares\MyMiddleware:myAction'
 				)
 			),
 			'/foobar/:id' => array(
@@ -200,45 +206,49 @@ full example
 		),
 
 		function() { echo 'global middleware'; },
-		'MyMiddleware:myAction'
+		'\MyMiddleware:myAction'
 
 	);
 
+### Calls a method from a controller
+
+Setup
+
+	<?php
+
+	$slim = new \Slim\Slim();
+    // LazyControllerConnector needs a Slim instance
+    $connector = new \Rgsone\Slim\LazyControllerConnector( $slim );
+
+Basic usage is to call an action/method from a controller
+
+	// calls myAction from MyController
+	$connector->callAction( '\MyController', 'myAction' );
+	// it also possible to pass args to the called method
+	$connector->callAction( '\MyController', 'myAction', array( 'my', 'parameters', 11 ) );
+
+`LazyControllerConnector::callAction` is useful particularly for `Slim::notFound` method
+
+	$slim->notFound( function() use ( $connector ) {
+    	$connector->callAction( '\Controllers\MyNotFoundController', 'do404' );
+    });
+
 ### Addition
 
-The `\Slim\Slim` instance is passed in constructor parameters of each controller.
+A `\Slim\Slim` instance is passed in constructor parameters of each controller
 
 	<?php
 
 	// example of controller
-
 	class MyController
 	{
-		private $slimApp;
+		private $_slimApp;
 
 		public function __construct( \Slim\Slim $slim )
 		{
-			$this->slimApp = $slim;
+			$this->_slimApp = $slim;
 		}
 	}
-
-## Configuration
-
-`ControllerConnector` allows to define a namespace prefix.
-If controllers are in `\\App\\Controller` namespace, configure the namespace prefix like this :
-
-	<?php
-
-	$connector = new \Rgsone\Slim\ControllerConnector( new \Slim\Slim() );
-	$connector->setNamespacePrefix( '\\App\\Controller' );
-
-And this following route
-
-	$connector->connect( 'GET', '/', 'HomeController:showIndex' );
-
-is translates to
-
-	$connector->connect( 'GET', '/', '\\App\\Controller\\HomeController:showIndex' );
 
 ## Author
 
@@ -250,4 +260,4 @@ to [Josh Lockhart](https://github.com/codeguy) for Slim Framework.
 
 ## License
 
-Slim Controller Connector is released under the MIT public license.
+Slim LazyControllerConnector is released under the MIT public license.
