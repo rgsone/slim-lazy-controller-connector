@@ -1,7 +1,7 @@
 {
 	"name": "rgsone/slim-lazy-controller-connector",
-	"description": "Extension for Slim Framework who provides a simple way to connect and 'lazy load' controller(s) with Slim route(s).",
-	"keywords": [ "slim", "extension", "microframework", "controller", "router", "lazy loading", "connector", "routing" ],
+	"description": "Extension for Slim Framework who provides a simple way to connect and 'lazy load' controller and middleware with Slim route.",
+	"keywords": [ "slim", "extension", "microframework", "framework", "controller", "router", "routing", "route", "lazy", "loading", "connector" ],
 	"homepage": "http://github.com/rgsone/slim-lazy-controller-connector",
 	"license": "MIT",
 	"authors": [{
