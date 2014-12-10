@@ -105,10 +105,9 @@ class LazyControllerConnector
 				$mwSplit = explode( ':', $mw );
 				$mwClass = $mwSplit[0];
 				$mwMethod = $mwSplit[1];
-				$self = $this;
 
-				$route->setMiddleware( function() use ( $mwClass, $mwMethod, $self ) {
-					$middleware = $self->register( $mwClass );
+				$route->setMiddleware( function() use ( $mwClass, $mwMethod ) {
+					$middleware = $this->register( $mwClass );
 					call_user_func( array( $middleware, $mwMethod ) );
 				});
 			}
@@ -145,16 +144,14 @@ class LazyControllerConnector
 	 */
 	public function connect( $httpMethod, $pattern, $callable, array $middlewares = array() )
 	{
-		$self = $this;
-
 		## creates Slim Route instance
 
 		$split = explode( ':', $callable );
 		$className = $split[0];
 		$methodName = $split[1];
 
-		$routeCallable = function() use ( $className, $methodName, $self ) {
-			$controller = $self->register( $className );
+		$routeCallable = function() use ( $className, $methodName ) {
+			$controller = $this->register( $className );
 			return call_user_func_array( array( $controller, $methodName ), func_get_args() );
 		};
 
@@ -222,10 +219,9 @@ class LazyControllerConnector
 			## creates route
 
 			$methodName = $params['action'];
-			$self = $this;
 
-			$routeCallable = function() use ( $controller, $methodName, $self ) {
-				$instance = $self->register( $controller );
+			$routeCallable = function() use ( $controller, $methodName ) {
+				$instance = $this->register( $controller );
 				return call_user_func_array( array( $instance, $methodName ), func_get_args() );
 			};
 
@@ -259,8 +255,8 @@ class LazyControllerConnector
 
 			$middlewares = ( isset( $globalMiddlewares ) ) ? $globalMiddlewares : array();
 			$middlewares = ( isset( $params['middlewares'] ) && is_array( $params['middlewares'] ) )
-						   ? array_merge( $middlewares, $params['middlewares'] )
-						   : $middlewares;
+				? array_merge( $middlewares, $params['middlewares'] )
+				: $middlewares;
 
 			if ( !empty( $middlewares ) )
 			{

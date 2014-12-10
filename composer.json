@@ -10,7 +10,7 @@
 		"homepage": "http://rgsone.com"
 	}],
 	"require": {
-		"php": ">=5.3.0",
+		"php": ">=5.4.0",
 		"slim/slim": "~2.4"
 	},
 	"autoload": {
