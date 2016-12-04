@@ -1,3 +1,5 @@
+[DEPRECATED] > Look at new Slim version
+
 # slim-lazy-controller-connector
 
 Slim `LazyControllerConnector` is an extension for Slim Framework who provides a simple way to connect
